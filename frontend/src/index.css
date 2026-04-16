@@ -1,0 +1,9 @@
+/* frontend/src/index.css */
+@import "tailwindcss";
+
+body {
+  background-color: #fdfcfb; /* Academic Cream */
+  color: #003049; /* Deep Navy */
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+}
