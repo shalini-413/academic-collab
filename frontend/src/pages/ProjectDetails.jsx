@@ -1,80 +1,101 @@
-// frontend/src/pages/ProjectDetails.jsx
-import { useState, useEffect, useContext } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const ProjectDetails = () => {
   const { id } = useParams();
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext); // Added 'user' here
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
 
-  const fetchDetails = async () => {
-    try {
-      const res = await axios.get(`http://localhost:5000/api/projects/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setProject(res.data);
-    } catch (err) {
-      console.error("Failed to fetch project details", err);
-    }
-  };
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const res = await axios.get(`http://localhost:5000/api/projects/${id}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setProject(res.data);
+      } catch (err) {
+        toast.error("Failed to load project details");
+      }
+    };
+    fetchProject();
+  }, [id, token]);
 
-  useEffect(() => { fetchDetails(); }, [id, token]);
-
-  const handleAction = async (studentId, action) => {
-    try {
-      const endpoint = action === 'approve' ? 'approve' : 'reject';
-      await axios.post(`http://localhost:5000/api/projects/${endpoint}`, 
-        { projectId: id, studentId }, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert(`Student ${action === 'approve' ? 'Accepted' : 'Declined'}`);
-      fetchDetails(); // Refresh list without reloading page
-    } catch (err) {
-      alert("Action failed");
-    }
-  };
-
-  if (!project) return <div className="p-20 text-center font-black">Loading Applications...</div>;
+  if (!project) return <div className="p-20 text-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-[#fdfcfb] p-8">
-      <button onClick={() => navigate(-1)} className="mb-6 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-[#f77f00]">← Back</button>
-      
-      <div className="max-w-5xl mx-auto bg-white rounded-[2rem] shadow-xl overflow-hidden border border-slate-100">
-        <div className="bg-[#003049] p-10 text-white">
-          <h2 className="text-3xl font-black tracking-tighter">{project.title}</h2>
-          <p className="text-[#fcbf49] font-bold uppercase tracking-widest text-[10px] mt-2">Manage Applicants</p>
-        </div>
-
-        <div className="p-10">
-          <h3 className="text-sm font-black text-[#003049] mb-6 uppercase tracking-widest border-b pb-4">Pending Applications ({project.applicants.length})</h3>
+    <div className="min-h-screen bg-[#fdfcfb] pb-20">
+      <div className="bg-[#003049] py-16 px-8 text-white">
+        <div className="max-w-4xl mx-auto">
+          <button onClick={() => navigate(-1)} className="text-white/60 mb-4 hover:text-white transition-all">
+            ← Back to Dashboard
+          </button>
           
-          <div className="space-y-4">
-            {project.applicants.length === 0 ? (
-              <p className="text-slate-400 italic">No pending applications.</p>
-            ) : (
-              project.applicants.map(student => (
-                <div key={student._id} className="flex flex-col md:flex-row items-center justify-between p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                  <div className="mb-4 md:mb-0">
-                    <p className="font-black text-[#003049] text-lg">{student.name}</p>
-                    <p className="text-xs text-slate-500 font-medium mb-2">{student.email}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {student.skills?.map((s, i) => (
-                        <span key={i} className="text-[9px] font-bold bg-white px-2 py-1 rounded border border-slate-200 uppercase">{s}</span>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-3">
-                    <button onClick={() => handleAction(student._id, 'approve')} className="bg-green-600 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase hover:bg-green-700">Accept</button>
-                    <button onClick={() => handleAction(student._id, 'reject')} className="bg-red-50 text-red-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white border border-red-200">Decline</button>
-                  </div>
-                </div>
-              ))
+          {/* Flex container to place Title and Button side by side */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <h1 className="text-4xl font-black">{project.title}</h1>
+              <div className="flex gap-3 mt-4">
+                <span className="bg-[#f77f00] px-4 py-1 rounded-full text-xs font-bold">{project.mode}</span>
+                <span className="bg-white/20 px-4 py-1 rounded-full text-xs font-bold">{project.isPaid ? 'Paid' : 'Unpaid'}</span>
+              </div>
+            </div>
+
+            {/* View Applications Button - Only visible to Professors */}
+            {user?.role === 'Professor' && (
+              <button 
+                onClick={() => navigate(`/project/${project._id}/applications`)}
+                className="bg-[#f77f00] text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-600 transition-all shadow-lg whitespace-nowrap"
+              >
+                View All Applications
+              </button>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-8 -mt-10">
+        <div className="bg-white rounded-3xl p-10 shadow-xl border border-slate-100">
+          <section className="mb-8">
+            <h3 className="text-slate-400 uppercase text-xs font-bold tracking-widest mb-3">Project Description</h3>
+            <p className="text-slate-700 leading-relaxed text-lg">{project.description}</p>
+          </section>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <div>
+              <h3 className="text-slate-400 uppercase text-xs font-bold tracking-widest mb-3">Required Skills</h3>
+              <div className="flex flex-wrap gap-2">
+                {project.requiredSkills?.map((skill, i) => (
+                  <span key={i} className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-sm font-medium">{skill}</span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-slate-400 uppercase text-xs font-bold tracking-widest mb-3">Research Fields</h3>
+              <div className="flex flex-wrap gap-2">
+                {project.researchField?.map((field, i) => (
+                  <span key={i} className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-sm font-medium">{field}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-100">
+            <div>
+              <p className="text-slate-400 text-xs font-bold uppercase">Duration</p>
+              <p className="font-bold text-[#003049]">{project.duration || 'Not specified'}</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs font-bold uppercase">Application Deadline</p>
+              <p className="font-bold text-[#003049]">{new Date(project.deadline).toLocaleDateString()}</p>
+            </div>
+            <div>
+              <p className="text-slate-400 text-xs font-bold uppercase">Current Status</p>
+              <p className={`font-bold ${project.status === 'Open' ? 'text-green-600' : 'text-red-500'}`}>{project.status}</p>
+            </div>
           </div>
         </div>
       </div>

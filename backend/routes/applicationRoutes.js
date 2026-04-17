@@ -1,14 +1,22 @@
-// backend/routes/applicationRoutes.js
 const express = require('express');
+const { 
+  applyToProject, 
+  getMyApplications, 
+  getProjectApplications, 
+  updateApplicationStatus 
+} = require('../controllers/applicationController');
+const { verifyToken, checkRole } = require('../middleware/authMiddleware');
+
+const upload = require('../middleware/upload'); 
+
 const router = express.Router();
 
-const { verifyToken } = require('../middleware/authMiddleware');
-const upload = require('../middleware/upload');
-const { applyToProject, getMyApplications } = require('../controllers/applicationController');
+// Student Routes
+router.post('/apply', verifyToken, checkRole(['Student']), upload.single('resume'), applyToProject);
+router.get('/my-applications', verifyToken, checkRole(['Student']), getMyApplications);
 
-// Apply with resume file upload
-router.post('/apply', verifyToken, upload.single('resume'), applyToProject);
-
-router.get('/my-applications', verifyToken, getMyApplications);
+// Professor Routes
+router.get('/project/:projectId', verifyToken, checkRole(['Professor']), getProjectApplications);
+router.put('/status', verifyToken, checkRole(['Professor']), updateApplicationStatus);
 
 module.exports = router;

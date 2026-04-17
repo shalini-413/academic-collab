@@ -58,6 +58,9 @@ exports.getRecommendedProjects = async (req, res) => {
   }
 };
 
+
+
+
 // Recommend Professors for Student
 exports.getRecommendedProfessors = async (req, res) => {
   try {
@@ -121,22 +124,26 @@ exports.approveStudent = async (req, res) => {
     }
 
     project.applicants = project.applicants.filter(id => id.toString() !== studentId);
-    if (!project.team.includes(studentId)) project.team.push(studentId);
+    if (!project.teamMembers.includes(studentId)) {
+      project.teamMembers.push(studentId);
+    }
+// FIX: Update the Application status document as well
+await Application.findOneAndUpdate(
+  { project: projectId, student: studentId },
+  { status: 'Accepted' }
+);
 
-    await project.save();
-    res.status(200).json({ message: "Student approved!", project });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+await project.save();
+res.status(200).json({ message: "Student approved!", project });
+} catch (error) {
+res.status(500).json({ error: error.message });
+}
 };
 
-// PROFESSOR: Get a specific project with applicant details
+// Get a specific project with all details
 exports.getProjectDetails = async (req, res) => {
   try {
-    // .populate() pulls the actual User data for the applicants
-    const project = await Project.findById(req.params.id)
-      .populate('applicants', 'name email skills'); 
-    
+    const project = await Project.findById(req.params.id); // This returns all fields in the schema
     if (!project) return res.status(404).json({ message: "Project not found" });
     res.status(200).json(project);
   } catch (error) {
@@ -156,7 +163,11 @@ exports.rejectStudent = async (req, res) => {
     if (project.professor.toString() !== req.user.id) {
       return res.status(403).json({ message: "Unauthorized" });
     }
-
+// Update the specific application document as well
+await Application.findOneAndUpdate(
+  { project: projectId, student: studentId },
+  { status: 'Rejected' }
+);
     // Remove them from the applicants list without adding to the team
     project.applicants = project.applicants.filter(id => id.toString() !== studentId);
     await project.save();
@@ -196,18 +207,61 @@ exports.getMyProjects = async (req, res) => {
   }
 };
 
-// Close Project
-exports.closeProject = async (req, res) => {
+// Edit Project
+exports.updateProject = async (req, res) => {
   try {
     const project = await Project.findOneAndUpdate(
       { _id: req.params.id, professor: req.user.id },
-      { status: 'Closed' },
+      req.body,
       { new: true }
     );
 
     if (!project) return res.status(404).json({ message: "Project not found or unauthorized" });
 
-    res.json({ message: "Project closed successfully", project });
+    res.json({ message: "Project updated successfully", project });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Delete Project
+exports.deleteProject = async (req, res) => {
+  try {
+    const project = await Project.findOneAndDelete({
+      _id: req.params.id,
+      professor: req.user.id
+    });
+
+    if (!project) return res.status(404).json({ message: "Project not found or unauthorized" });
+
+    res.json({ message: "Project deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// backend/controllers/projectController.js
+
+exports.closeProject = async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id);
+
+    if (!project) return res.status(404).json({ message: "Project not found" });
+
+    if (project.professor.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Toggle logic
+    const newStatus = project.status === 'Open' ? 'Closed' : 'Open';
+
+    project.status = newStatus;
+    await project.save();
+
+    res.json({ 
+      message: `Project marked as ${newStatus}`, 
+      project 
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

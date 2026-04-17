@@ -1,28 +1,30 @@
-// backend/controllers/notificationController.js
 const Notification = require('../models/Notification');
 
-// Get all notifications for current user
-const getNotifications = async (req, res) => {
+exports.getNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find({ user: req.user.id })
-      .sort({ createdAt: -1 })
-      .limit(50);
-
+      .populate('sender', 'name role')
+      .sort({ createdAt: -1 });
     res.json(notifications);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Mark notification as read
-const markAsRead = async (req, res) => {
+exports.markAsRead = async (req, res) => {
   try {
-    const { notificationId } = req.params;
-    await Notification.findByIdAndUpdate(notificationId, { isRead: true });
+    await Notification.findByIdAndUpdate(req.params.id, { isRead: true });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-module.exports = { getNotifications, markAsRead };
+exports.markAllAsRead = async (req, res) => {
+  try {
+    await Notification.updateMany({ user: req.user.id }, { isRead: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

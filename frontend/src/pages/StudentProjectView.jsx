@@ -74,41 +74,46 @@ const StudentProjectView = () => {
   };
 
   // Submit Application
-  const handleApply = async (e) => {
-    e.preventDefault();
-    if (!coverLetter.trim()) {
-      toast.error("Cover letter is required");
-      return;
-    }
+// Submit Application (Updated for File Uploads)
+const handleApply = async (e) => {
+  e.preventDefault();
+  if (!coverLetter.trim()) {
+    toast.error("Cover letter is required");
+    return;
+  }
 
-    setIsSubmitting(true);
-    const formData = new FormData();
-    formData.append('projectId', id);
-    formData.append('coverLetter', coverLetter.trim());
-    if (resumeFile) formData.append('resume', resumeFile);
-    if (additionalLinks.length > 0) {
-      formData.append('additionalLinks', JSON.stringify(additionalLinks.filter(l => l.title && l.url)));
-    }
+  setIsSubmitting(true);
+  
+  // 1. Use FormData instead of a standard JSON object
+  const formData = new FormData();
+  formData.append('projectId', id);
+  formData.append('coverLetter', coverLetter.trim());
+  
+  // 2. Append the resume file if it exists
+  if (resumeFile) {
+    formData.append('resume', resumeFile);
+  }
+  
+  // 3. Stringify the array so it can be sent via FormData
+  if (additionalLinks.length > 0) {
+    formData.append('additionalLinks', JSON.stringify(additionalLinks));
+  }
 
-    try {
-      await axios.post('http://localhost:5000/api/applications/apply', formData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-
-      toast.success("Application submitted successfully!");
-      setShowApplyForm(false);        // Close form after success
-      setCoverLetter("");
-      setResumeFile(null);
-      setAdditionalLinks([]);
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to submit application");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  try {
+    await axios.post('http://localhost:5000/api/applications/apply', formData, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data' // 4. Explicitly state the content type
+      }
+    });
+    toast.success("Application submitted successfully!");
+    setShowApplyForm(false);
+  } catch (err) {
+    toast.error(err.response?.data?.message || "Failed to apply");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   if (loading) {
     return <div className="p-20 text-center font-bold text-[#003049]">Loading project details...</div>;

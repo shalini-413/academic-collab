@@ -32,19 +32,19 @@ exports.register = async (req, res) => {
 // backend/controllers/authController.js
 
 // backend/controllers/authController.js
+// Keep only this version and ensure it includes professor-specific fields
 exports.updateProfile = async (req, res) => {
   try {
     let updates = { ...req.body };
 
-    // Force arrays to be proper arrays
-    if (updates.skills) {
-      updates.skills = Array.isArray(updates.skills) ? updates.skills : 
-                       typeof updates.skills === 'string' ? updates.skills.split(',').map(s => s.trim()).filter(Boolean) : [];
-    }
+    // Prevent users from verifying themselves
+    delete updates.isVerified; 
 
+    // Formatting for Tag-based research fields
     if (updates.researchInterests) {
-      updates.researchInterests = Array.isArray(updates.researchInterests) ? updates.researchInterests : 
-                                  typeof updates.researchInterests === 'string' ? updates.researchInterests.split(',').map(s => s.trim()).filter(Boolean) : [];
+      updates.researchInterests = Array.isArray(updates.researchInterests) 
+        ? updates.researchInterests 
+        : updates.researchInterests.split(',').map(s => s.trim()).filter(Boolean);
     }
 
     const user = await User.findByIdAndUpdate(
@@ -53,18 +53,11 @@ exports.updateProfile = async (req, res) => {
       { new: true, runValidators: true }
     ).select('-password');
 
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    res.json({ 
-      message: "Profile updated successfully", 
-      user 
-    });
+    res.json({ message: "Profile updated successfully", user });
   } catch (err) {
-    console.error("Update Profile Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
-
 // Helper function for completion %
 function calculateProfileCompletion(user) {
   let score = 20; // base for name + email
@@ -103,19 +96,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// NEW: Profile Update Logic
-exports.updateProfile = async (req, res) => {
-  try {
-    const updates = req.body;
-    // Don't allow password updates through this specific route for security
-    delete updates.password; 
-    
-    const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true }).select('-password');
-    res.json({ message: "Profile updated successfully", user });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 
 exports.getProfile = async (req, res) => {
     try {
