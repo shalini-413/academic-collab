@@ -34,7 +34,14 @@ const toggleSave = async (req, res) => {
 const getSavedProjects = async (req, res) => {
   try {
     const user = await User.findById(req.user.id)
-      .populate('savedProjects', 'title description professor requiredSkills');
+      .populate({
+        path: 'savedProjects',
+        select: 'title description professor requiredSkills researchField duration isPaid mode deadline status createdAt',
+        populate: {
+          path: 'professor',
+          select: 'name university avatar'
+        }
+      });
 
     res.json(user?.savedProjects || []);
   } catch (err) {

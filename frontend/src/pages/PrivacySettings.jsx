@@ -18,7 +18,7 @@ const PrivacySettings = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/auth/profile', {
+        const res = await axios.get(import.meta.env.VITE_API_URL + '/api/auth/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setSettings(res.data.privacySettings || settings);
@@ -40,7 +40,7 @@ const PrivacySettings = () => {
 
   const saveSettings = async () => {
     try {
-      await axios.put('http://localhost:5000/api/auth/profile', {
+      await axios.put(import.meta.env.VITE_API_URL + '/api/auth/profile', {
         privacySettings: settings
       }, {
         headers: { Authorization: `Bearer ${token}` }

@@ -11,7 +11,7 @@ const Notifications = () => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/notifications', {
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/notifications', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(res.data);
@@ -28,7 +28,7 @@ const Notifications = () => {
 
   const handleMarkAsRead = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/notifications/${id}/read`, {}, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/notifications/${id}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // Update local state to reflect read status immediately
@@ -40,7 +40,7 @@ const Notifications = () => {
 
   const markAllRead = async () => {
     try {
-      await axios.put('http://localhost:5000/api/notifications/read-all', {}, {
+      await axios.put(import.meta.env.VITE_API_URL + '/api/notifications/read-all', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchNotifications();

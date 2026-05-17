@@ -1,77 +1,3 @@
-// import { useState, useContext } from 'react';
-// import { useNavigate, Link } from 'react-router-dom';
-// import { AuthContext } from '../context/AuthContext';
-
-// const Login = () => {
-//   const [email, setEmail] = useState('');
-//   const [password, setPassword] = useState('');
-//   const [error, setError] = useState('');
-  
-//   const { login } = useContext(AuthContext);
-//   const navigate = useNavigate();
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-//     setError('');
-    
-//     const result = await login(email, password);
-    
-//     if (result.success) {
-//       // Redirect based on role
-//       if (result.role === 'Student') navigate('/student-dashboard');
-//       else if (result.role === 'Professor') navigate('/professor-dashboard');
-//       else if (result.role === 'Admin') navigate('/admin-dashboard');
-//     } else {
-//       setError(result.message);
-//     }
-//   };
-
-// return (
-//   <div className="min-h-[85vh] flex items-center justify-center p-6">
-//     <div className="w-full max-w-md premium-card overflow-hidden">
-//       {/* Decorative Brand Header */}
-//       <div className="bg-brand-navy p-12 text-center relative">
-//         <div className="absolute top-0 right-0 w-32 h-32 bg-brand-orange/10 rounded-full -mr-16 -mt-16"></div>
-//         <h2 className="text-4xl font-extrabold text-white tracking-tighter">Welcome.</h2>
-//         <p className="text-brand-yellow font-bold uppercase tracking-[0.3em] text-[10px] mt-4">Authorized Access</p>
-//       </div>
-      
-//       <form onSubmit={handleSubmit} className="p-10 space-y-8">
-//         <div className="space-y-2">
-//           <label className="text-[11px] font-black uppercase tracking-widest ml-1 opacity-60">University ID</label>
-//           <input 
-//             type="email" 
-//             className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-medium"
-//             placeholder="admin@university.edu"
-//             value={email}
-//             onChange={(e) => setEmail(e.target.value)}
-//           />
-//         </div>
-
-//         <div className="space-y-2">
-//           <label className="text-[11px] font-black uppercase tracking-widest ml-1 opacity-60">Security Key</label>
-//           <input 
-//             type="password" 
-//             className="w-full px-6 py-4 bg-gray-50 border-2 border-transparent rounded-2xl focus:border-brand-orange focus:bg-white outline-none transition-all font-medium"
-//             placeholder="••••••••"
-//             value={password}
-//             onChange={(e) => setPassword(e.target.value)}
-//           />
-//         </div>
-
-//         <button className="btn-primary w-full py-5 text-lg">Sign In</button>
-//       </form>
-//     </div>
-//   </div>
-// );
-// };
-
-// export default Login;
-
-
-
-
-
 import { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
@@ -82,25 +8,30 @@ const Login = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-// Inside Login.jsx
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    // Assuming your login function returns the user object or updates the context
-    const userResponse = await login(formData.email, formData.password);
-    
-    toast.success('Access Granted');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const loadingToast = toast.loading('Authenticating...');
+    try {
+      // login now returns the result of the API call
+      const result = await login(formData.email, formData.password);
+      
+      toast.dismiss(loadingToast);
+      toast.success('Access Granted');
 
-    // Role-based Redirection Logic
-    if (userResponse.role === 'Professor') {
-      navigate('/professor-dashboard');
-    } else {
-      navigate('/student-dashboard');
+      // Redirection based on user role from the response
+      if (result.user.role === 'Professor') {
+        navigate('/professor-dashboard');
+      } else if (result.user.role === 'Admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/student-dashboard');
+      }
+    } catch (err) {
+      toast.dismiss(loadingToast);
+      const message = err.response?.data?.message || 'Authentication Failed';
+      toast.error(message);
     }
-  } catch (err) {
-    toast.error('Authentication Failed');
-  }
-};
+  };
 
   return (
     <div className="min-h-screen flex bg-[#0f0c29]">
@@ -120,7 +51,6 @@ const handleSubmit = async (e) => {
             <div className="h-1 w-8 bg-white/20 rounded-full"></div>
           </div>
         </div>
-        {/* Decorative Circles */}
         <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-[#7b2cbf] rounded-full blur-[120px] opacity-30"></div>
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-[#3c096c] rounded-full blur-[120px] opacity-30"></div>
       </div>

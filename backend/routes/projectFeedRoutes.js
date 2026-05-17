@@ -7,7 +7,22 @@ const { verifyToken } = require('../middleware/authMiddleware');
 // GET All Projects for Feed - Only needs login (no role restriction)
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const projects = await Project.find()
+    const { q, isPaid, mode } = req.query;
+    let query = { status: 'Open' }; // only show Open projects in feed
+
+    if (q) {
+      query.$or = [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { requiredSkills: { $regex: q, $options: 'i' } }
+      ];
+    }
+    
+    if (isPaid === 'true') query.isPaid = true;
+    if (isPaid === 'false') query.isPaid = false;
+    if (mode && mode !== '') query.mode = mode;
+
+    const projects = await Project.find(query)
       .populate('professor', 'name university')
       .sort({ createdAt: -1 });
 

@@ -5,7 +5,19 @@ const notificationSchema = new mongoose.Schema({
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who triggered it
   type: { 
     type: String, 
-    enum: ['application_received', 'message_received', 'application_status', 'deadline_reminder', 'chat_request'],
+    enum: [
+      'application_received',
+      'message_received',
+      'application_status',
+      'deadline_reminder',
+      'chat_request',
+      'chat_accepted',
+      'chat_rejected',
+      'new_message',
+      'project_status',
+      'project_invite',
+      'profile_update'
+    ],
     required: true 
   },
   title: { type: String, required: true },

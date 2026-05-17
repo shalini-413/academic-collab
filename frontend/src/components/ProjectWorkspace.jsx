@@ -16,7 +16,7 @@ const ProjectWorkspace = ({ projectId }) => {
 
   // Initialize Socket once
   useEffect(() => {
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io(import.meta.env.VITE_API_URL, {
       reconnection: true,
       reconnectionAttempts: 5,
     });
@@ -39,7 +39,7 @@ const ProjectWorkspace = ({ projectId }) => {
   useEffect(() => {
     const fetchWorkspace = async () => {
       try {
-        const res = await axios.get(`http://localhost:5000/api/projects/${projectId}`, {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/projects/${projectId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setProject(res.data);

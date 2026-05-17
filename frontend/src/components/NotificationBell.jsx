@@ -3,16 +3,17 @@ import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { io } from 'socket.io-client';
 
 const NotificationBell = () => {
-  const { token } = useContext(AuthContext);
+  const { token, user } = useContext(AuthContext);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
 
   const fetchNotifications = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/notifications', {
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/notifications', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(res.data);
@@ -23,14 +24,28 @@ const NotificationBell = () => {
   };
 
   useEffect(() => {
+    if (!token) return;
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 8000); // Refresh every 8 seconds
-    return () => clearInterval(interval);
-  }, [token]);
+    
+    if (user?.id) {
+      const socket = io(import.meta.env.VITE_API_URL);
+      socket.emit('join_chat', user.id);
+      
+      socket.on('receive_notification', (newNotif) => {
+        setNotifications(prev => [newNotif, ...prev]);
+        setUnreadCount(prev => prev + 1);
+        toast.success(newNotif.title || "New Notification");
+      });
+
+      return () => {
+        socket.disconnect();
+      };
+    }
+  }, [token, user]);
 
   const markAsRead = async (notificationId) => {
     try {
-      await axios.put(`http://localhost:5000/api/notifications/${notificationId}/read`, {}, {
+      await axios.put(`${import.meta.env.VITE_API_URL}/api/notifications/${notificationId}/read`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchNotifications();

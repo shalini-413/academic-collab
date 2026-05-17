@@ -19,6 +19,8 @@ const ProjectSchema = new mongoose.Schema({
   isPaid: { type: Boolean, default: false },
   mode: { type: String, enum: ['Remote', 'On-site', 'Hybrid'], default: 'Remote' },
   deadline: { type: Date },
+  applicantLimit: { type: Number, default: 0 },
+  visibility: { type: String, enum: ['Public', 'Invite-only', 'Hidden'], default: 'Public' },
   status: { 
     type: String, 
     enum: ['Open', 'In Progress', 'Completed', 'Closed'], 
@@ -33,5 +35,13 @@ const ProjectSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now }
   }]
 }, { timestamps: true });
+
+ProjectSchema.pre('findOneAndDelete', async function (next) {
+  const projectId = this.getQuery()._id;
+  await mongoose.model('Application').deleteMany({ project: projectId });
+  await mongoose.model('ChatRequest').deleteMany({ project: projectId });
+  // Also clean up notifications if possible, or bookmarks
+  next();
+});
 
 module.exports = mongoose.model('Project', ProjectSchema);

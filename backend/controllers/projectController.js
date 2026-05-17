@@ -1,12 +1,14 @@
+const Application = require('../models/Application');
 const Project = require('../models/Project');
 const User = require('../models/User');
-const { getMatchScore } = require('../utils/aiMatcher');
+const { matchingEngine, clearCacheForProject } = require('../utils/aiMatcher');
+const { notifyMany } = require('../shared/services/notificationService');
 
 // 1. PROFESSOR: Create a new project
 // Create Project (Improved)
 exports.createProject = async (req, res) => {
   try {
-    const { title, description, requiredSkills, researchField, duration, isPaid, mode, deadline } = req.body;
+    const { title, description, requiredSkills, researchField, duration, isPaid, mode, deadline, applicantLimit, visibility } = req.body;
 
     const newProject = new Project({
       title,
@@ -17,6 +19,8 @@ exports.createProject = async (req, res) => {
       isPaid: isPaid || false,
       mode: mode || 'Remote',
       deadline,
+      applicantLimit: Number(applicantLimit || 0),
+      visibility: visibility || 'Public',
       professor: req.user.id,
       status: 'Open'
     });
@@ -36,19 +40,20 @@ exports.getRecommendedProjects = async (req, res) => {
     const student = await User.findById(req.user.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const openProjects = await Project.find({ status: 'Open' })
-      .populate('professor', 'name university');
+    const openProjects = await Project.find({ status: 'Open', visibility: { $ne: 'Hidden' } })
+    .populate('professor', 'name university avatar');
 
     const scoredProjects = openProjects.map(project => {
-      const score = getMatchScore(student.skills || [], project.requiredSkills || []);
+      const match = matchingEngine.getStudentProjectMatchScore(student, project);
       return { 
-        ...project._doc, 
-        matchScore: score,
+        ...project.toObject(), 
+        matchScore: match.matchScore,
+        matchedDetails: match.matchedDetails,
         professorName: project.professor?.name,
-        professorUniversity: project.professor?.university
+        professorUniversity: project.professor?.university,
+        professorAvatar: project.professor?.avatar
       };
     });
-
     // Sort by match score (highest first) and return top 8
     scoredProjects.sort((a, b) => b.matchScore - a.matchScore);
 
@@ -69,16 +74,13 @@ exports.getRecommendedProfessors = async (req, res) => {
 
     const professors = await User.find({ 
       role: 'Professor' 
-    }).select('name email university bio researchInterests skills');
+    }).select('name email avatar designation department university bio researchInterests skills');
 
     const scoredProfessors = professors.map(prof => {
-      const score = getMatchScore(
-        student.skills || [], 
-        prof.researchInterests || []
-      );
+      const match = matchingEngine.compareProfiles(student, prof);
       return { 
-        ...prof._doc, 
-        matchScore: score 
+        ...prof.toObject(), 
+        ...match
       };
     });
 
@@ -98,6 +100,10 @@ exports.applyForProject = async (req, res) => {
 
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ message: "Project not found" });
+    if (project.status !== 'Open') return res.status(400).json({ message: "This project is closed for new applications." });
+    if (project.applicantLimit > 0 && project.applicants.length >= project.applicantLimit) {
+      return res.status(400).json({ message: "This project has reached its applicant limit." });
+    }
 
     if (project.applicants.includes(studentId)) {
       return res.status(400).json({ message: "Already applied" });
@@ -143,9 +149,24 @@ res.status(500).json({ error: error.message });
 // Get a specific project with all details
 exports.getProjectDetails = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id); // This returns all fields in the schema
+    const project = await Project.findById(req.params.id)
+      .populate('professor', 'name avatar university department designation')
+      .populate('applicants', 'name avatar university skills researchInterests')
+      .populate('teamMembers', 'name avatar university skills researchInterests');
     if (!project) return res.status(404).json({ message: "Project not found" });
-    res.status(200).json(project);
+
+    const applications = await Application.find({ project: project._id }).select('status createdAt appliedAt');
+    const applicationStats = applications.reduce((stats, application) => {
+      stats.total += 1;
+      stats[application.status] = (stats[application.status] || 0) + 1;
+      return stats;
+    }, { total: 0, Applied: 0, Shortlisted: 0, Accepted: 0, Rejected: 0, Withdrawn: 0 });
+
+    res.status(200).json({
+      ...project.toObject(),
+      applicationStats,
+      recentActivity: applications.slice(-5).reverse()
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -199,7 +220,7 @@ exports.getMyProjects = async (req, res) => {
   try {
     const projects = await Project.find({ professor: req.user.id })
       .sort({ createdAt: -1 })
-      .populate('applicants', 'name email university skills');
+      .populate('applicants', 'name email university skills avatar');
 
     res.status(200).json(projects);
   } catch (error) {
@@ -210,9 +231,12 @@ exports.getMyProjects = async (req, res) => {
 // Edit Project
 exports.updateProject = async (req, res) => {
   try {
+    const updates = { ...req.body };
+    if (updates.applicantLimit !== undefined) updates.applicantLimit = Number(updates.applicantLimit || 0);
+
     const project = await Project.findOneAndUpdate(
       { _id: req.params.id, professor: req.user.id },
-      req.body,
+      updates,
       { new: true }
     );
 
@@ -252,11 +276,23 @@ exports.closeProject = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // Toggle logic
+    const previousStatus = project.status;
     const newStatus = project.status === 'Open' ? 'Closed' : 'Open';
 
     project.status = newStatus;
     await project.save();
+
+    if (previousStatus !== newStatus) {
+      const applications = await Application.find({ project: project._id, status: { $ne: 'Withdrawn' } }).select('student');
+      await notifyMany(req, applications.map((application) => ({
+        user: application.student,
+        sender: req.user.id,
+        type: 'project_status',
+        title: `Project ${newStatus}`,
+        message: `"${project.title}" is now ${newStatus.toLowerCase()}.`,
+        relatedId: project._id
+      })));
+    }
 
     res.json({ 
       message: `Project marked as ${newStatus}`, 

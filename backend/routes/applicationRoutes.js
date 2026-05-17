@@ -3,7 +3,8 @@ const {
   applyToProject, 
   getMyApplications, 
   getProjectApplications, 
-  updateApplicationStatus 
+  updateApplicationStatus,
+  bulkUpdateApplicationStatus
 } = require('../controllers/applicationController');
 const { verifyToken, checkRole } = require('../middleware/authMiddleware');
 
@@ -17,6 +18,9 @@ router.get('/my-applications', verifyToken, checkRole(['Student']), getMyApplica
 
 // Professor Routes
 router.get('/project/:projectId', verifyToken, checkRole(['Professor']), getProjectApplications);
-router.put('/status', verifyToken, checkRole(['Professor']), updateApplicationStatus);
+
+// Shared Route (Controller checks role logic)
+router.put('/status', verifyToken, updateApplicationStatus);
+router.put('/bulk-status', verifyToken, checkRole(['Professor']), bulkUpdateApplicationStatus);
 
 module.exports = router;

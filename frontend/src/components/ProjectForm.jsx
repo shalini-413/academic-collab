@@ -14,7 +14,9 @@ const ProjectForm = ({ onProjectCreated }) => {
     duration: '',
     isPaid: false,
     mode: 'Remote',
-    deadline: ''
+    deadline: '',
+    applicantLimit: 0,
+    visibility: 'Public'
   });
 
   const handleSubmit = async (e) => {
@@ -27,7 +29,7 @@ const ProjectForm = ({ onProjectCreated }) => {
         researchField: formData.researchField.split(',').map(s => s.trim()).filter(Boolean)
       };
 
-      await axios.post('http://localhost:5000/api/projects/create', payload, {
+      await axios.post(import.meta.env.VITE_API_URL + '/api/projects/create', payload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -41,7 +43,9 @@ const ProjectForm = ({ onProjectCreated }) => {
         duration: '',
         isPaid: false,
         mode: 'Remote',
-        deadline: ''
+        deadline: '',
+        applicantLimit: 0,
+        visibility: 'Public'
       });
     } catch (err) {
       toast.error("Failed to post project");
@@ -81,7 +85,7 @@ const ProjectForm = ({ onProjectCreated }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
         <div>
           <label className="block text-sm font-semibold mb-2">Mode</label>
           <select value={formData.mode} onChange={e => setFormData({...formData, mode: e.target.value})} className="w-full p-4 border border-slate-200 rounded-2xl">
@@ -102,6 +106,18 @@ const ProjectForm = ({ onProjectCreated }) => {
         <div>
           <label className="block text-sm font-semibold mb-2">Deadline</label>
           <input type="date" value={formData.deadline} onChange={e => setFormData({...formData, deadline: e.target.value})} className="w-full p-4 border border-slate-200 rounded-2xl" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-2">Applicant Limit</label>
+          <input type="number" min="0" value={formData.applicantLimit} onChange={e => setFormData({...formData, applicantLimit: e.target.value})} className="w-full p-4 border border-slate-200 rounded-2xl" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold mb-2">Visibility</label>
+          <select value={formData.visibility} onChange={e => setFormData({...formData, visibility: e.target.value})} className="w-full p-4 border border-slate-200 rounded-2xl">
+            <option>Public</option>
+            <option>Invite-only</option>
+            <option>Hidden</option>
+          </select>
         </div>
       </div>
 

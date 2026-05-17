@@ -18,7 +18,7 @@
 //         skills: formData.skills.split(',').map(s => s.trim()).filter(s => s !== "")
 //       };
       
-//       const res = await axios.post('http://localhost:5000/api/auth/register', submissionData);
+//       const res = await axios.post(import.meta.env.VITE_API_URL + '/api/auth/register', submissionData);
 //       alert(res.data.message);
 //       navigate('/login');
 //     } catch (err) {
@@ -49,9 +49,9 @@
 
 
 import { useState } from 'react';
-import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { authService } from '../shared/services/authService';
 
 const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'Student' });
@@ -60,7 +60,7 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/auth/register', formData);
+      await authService.register(formData);
       toast.success('Registration successful! Please login.');
       navigate('/login');
     } catch (err) {

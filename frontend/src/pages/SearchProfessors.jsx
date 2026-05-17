@@ -18,7 +18,7 @@ const SearchProfessors = () => {
   const fetchProfessors = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:5000/api/search/professors', {
+      const res = await axios.get(import.meta.env.VITE_API_URL + '/api/search/professors', {
         headers: { Authorization: `Bearer ${token}` },
         params: { q: searchTerm, university, country, type, payment }
       });
@@ -91,8 +91,21 @@ const SearchProfessors = () => {
                   <h3 className="font-black text-xl text-navy">{prof.name}</h3>
                   <p className="text-orange text-sm">{prof.university} • {prof.country}</p>
                 </div>
+                {prof.matchScore !== undefined && (
+                  <div className="min-w-[86px] text-right" title={prof.whyMatched || ''}>
+                    <p className="text-lg font-black text-navy">{prof.matchScore}%</p>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-orange transition-all duration-700" style={{ width: `${Math.max(0, Math.min(100, prof.matchScore || 0))}%` }} />
+                    </div>
+                  </div>
+                )}
               </div>
               <p className="mt-4 text-slate-600 line-clamp-3">{prof.bio || 'No bio available'}</p>
+              {prof.matchedKeywords?.length > 0 && (
+                <p className="mt-3 line-clamp-1 text-xs font-semibold text-slate-500" title={prof.whyMatched}>
+                  Matched because of {prof.matchedKeywords.slice(0, 4).join(', ')}
+                </p>
+              )}
               
               <div className="mt-6 flex flex-wrap gap-2">
                 {prof.researchInterests?.map((interest, i) => (

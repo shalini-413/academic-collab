@@ -1,106 +1,152 @@
-import { useEffect, useState, useContext } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import axios from 'axios';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import LoadingScreen from '../shared/components/LoadingScreen';
+import PageShell from '../shared/components/PageShell';
+import { notify } from '../shared/services/notify';
+import { formatDate, statusTone } from '../shared/utils/formatters';
+import { projectManagementService } from '../professor/services/projectManagementService';
 
 const ProjectDetails = () => {
   const { id } = useParams();
-  const { token, user } = useContext(AuthContext); // Added 'user' here
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
+  const [controls, setControls] = useState({ applicantLimit: 0, visibility: 'Public' });
+  const [saving, setSaving] = useState(false);
+
+  const loadProject = async () => {
+    try {
+      const data = await projectManagementService.getProject(id);
+      setProject(data);
+      setControls({ applicantLimit: data.applicantLimit || 0, visibility: data.visibility || 'Public' });
+    } catch (error) {
+      notify.error('Failed to load project details');
+    }
+  };
 
   useEffect(() => {
-    const fetchProject = async () => {
-      try {
-        const res = await axios.get(`http://localhost:5000/api/projects/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setProject(res.data);
-      } catch (err) {
-        toast.error("Failed to load project details");
-      }
-    };
-    fetchProject();
-  }, [id, token]);
+    loadProject();
+  }, [id]);
 
-  if (!project) return <div className="p-20 text-center">Loading...</div>;
+  const updateControls = async () => {
+    setSaving(true);
+    try {
+      const result = await projectManagementService.updateProject(id, controls);
+      setProject((current) => ({ ...current, ...result.project }));
+      notify.success('Project controls updated');
+    } catch (error) {
+      notify.error('Failed to update project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleStatus = async () => {
+    try {
+      const result = await projectManagementService.toggleStatus(id);
+      setProject(result.project);
+      notify.success(result.message);
+      loadProject();
+    } catch (error) {
+      notify.error('Failed to update project status');
+    }
+  };
+
+  if (!project) return <LoadingScreen label="Loading project" />;
+
+  const stats = project.applicationStats || {};
+  const accepted = stats.Accepted || 0;
+  const pending = stats.Applied || 0;
+  const rejected = stats.Rejected || 0;
+  const shortlisted = stats.Shortlisted || 0;
 
   return (
-    <div className="min-h-screen bg-[#fdfcfb] pb-20">
-      <div className="bg-[#003049] py-16 px-8 text-white">
-        <div className="max-w-4xl mx-auto">
-          <button onClick={() => navigate(-1)} className="text-white/60 mb-4 hover:text-white transition-all">
-            ← Back to Dashboard
-          </button>
-          
-          {/* Flex container to place Title and Button side by side */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div>
-              <h1 className="text-4xl font-black">{project.title}</h1>
-              <div className="flex gap-3 mt-4">
-                <span className="bg-[#f77f00] px-4 py-1 rounded-full text-xs font-bold">{project.mode}</span>
-                <span className="bg-white/20 px-4 py-1 rounded-full text-xs font-bold">{project.isPaid ? 'Paid' : 'Unpaid'}</span>
-              </div>
+    <PageShell
+      eyebrow="Professor Project"
+      title={project.title}
+      description={project.description}
+      action={<button onClick={() => navigate(`/project/${project._id}/applications`)} className="rounded-lg bg-[#2563eb] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1d4ed8]">View Applications</button>}
+    >
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <section className="space-y-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusTone(project.status)}`}>{project.status}</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{project.mode}</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{project.isPaid ? 'Paid' : 'Unpaid'}</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{project.visibility || 'Public'}</span>
             </div>
 
-            {/* View Applications Button - Only visible to Professors */}
-            {user?.role === 'Professor' && (
-              <button 
-                onClick={() => navigate(`/project/${project._id}/applications`)}
-                className="bg-[#f77f00] text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-600 transition-all shadow-lg whitespace-nowrap"
-              >
-                View All Applications
+            <div className="mt-6 grid gap-4 md:grid-cols-4">
+              {[['Total', stats.total || 0], ['Pending', pending], ['Accepted', accepted], ['Rejected', rejected]].map(([label, value]) => (
+                <div key={label} className="rounded-lg bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-950">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-950">Required Skills</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(project.requiredSkills || []).map((skill) => <span key={skill} className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{skill}</span>)}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-950">Research Fields</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(project.researchField || []).map((field) => <span key={field} className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">{field}</span>)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-950">Project Analytics</h2>
+            <div className="mt-5 grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-slate-200 p-4"><p className="text-xs text-slate-400">Conversion</p><p className="mt-1 text-xl font-semibold">{stats.total ? Math.round((accepted / stats.total) * 100) : 0}%</p></div>
+              <div className="rounded-lg border border-slate-200 p-4"><p className="text-xs text-slate-400">Shortlisted</p><p className="mt-1 text-xl font-semibold">{shortlisted}</p></div>
+              <div className="rounded-lg border border-slate-200 p-4"><p className="text-xs text-slate-400">Deadline</p><p className="mt-1 text-xl font-semibold">{formatDate(project.deadline)}</p></div>
+            </div>
+          </div>
+        </section>
+
+        <aside className="space-y-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-950">Controls</h2>
+            <div className="mt-5 space-y-4">
+              <button onClick={toggleStatus} className="w-full rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800">
+                {project.status === 'Open' ? 'Close Project' : 'Reopen Project'}
               </button>
-            )}
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Applicant Limit</span>
+                <input type="number" min="0" className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={controls.applicantLimit} onChange={(event) => setControls((current) => ({ ...current, applicantLimit: event.target.value }))} />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visibility</span>
+                <select className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" value={controls.visibility} onChange={(event) => setControls((current) => ({ ...current, visibility: event.target.value }))}>
+                  <option>Public</option>
+                  <option>Invite-only</option>
+                  <option>Hidden</option>
+                </select>
+              </label>
+              <button disabled={saving} onClick={updateControls} className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">Save Controls</button>
+            </div>
           </div>
-        </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-950">Recent Activity</h2>
+            <div className="mt-4 space-y-3">
+              {(project.recentActivity || []).length === 0 ? <p className="text-sm text-slate-500">No recent application activity.</p> : project.recentActivity.map((item, index) => (
+                <div key={index} className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Application marked <span className="font-semibold text-slate-900">{item.status}</span></div>
+              ))}
+            </div>
+          </div>
+        </aside>
       </div>
-
-      <div className="max-w-4xl mx-auto px-8 -mt-10">
-        <div className="bg-white rounded-3xl p-10 shadow-xl border border-slate-100">
-          <section className="mb-8">
-            <h3 className="text-slate-400 uppercase text-xs font-bold tracking-widest mb-3">Project Description</h3>
-            <p className="text-slate-700 leading-relaxed text-lg">{project.description}</p>
-          </section>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            <div>
-              <h3 className="text-slate-400 uppercase text-xs font-bold tracking-widest mb-3">Required Skills</h3>
-              <div className="flex flex-wrap gap-2">
-                {project.requiredSkills?.map((skill, i) => (
-                  <span key={i} className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-sm font-medium">{skill}</span>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-slate-400 uppercase text-xs font-bold tracking-widest mb-3">Research Fields</h3>
-              <div className="flex flex-wrap gap-2">
-                {project.researchField?.map((field, i) => (
-                  <span key={i} className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-sm font-medium">{field}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-slate-100">
-            <div>
-              <p className="text-slate-400 text-xs font-bold uppercase">Duration</p>
-              <p className="font-bold text-[#003049]">{project.duration || 'Not specified'}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 text-xs font-bold uppercase">Application Deadline</p>
-              <p className="font-bold text-[#003049]">{new Date(project.deadline).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-slate-400 text-xs font-bold uppercase">Current Status</p>
-              <p className={`font-bold ${project.status === 'Open' ? 'text-green-600' : 'text-red-500'}`}>{project.status}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </PageShell>
   );
 };
 
 export default ProjectDetails;
+

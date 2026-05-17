@@ -1,64 +1,66 @@
 import { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { authService } from '../shared/services/authService';
+import { setAuthToken } from '../shared/services/apiClient';
 
-// 1. Create the Context
 export const AuthContext = createContext();
 
-// 2. Create the Provider Component
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token') || null);
+  // Safe initialization to prevent "undefined" JSON error
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    try {
+      return (savedUser && savedUser !== "undefined") ? JSON.parse(savedUser) : null;
+    } catch (err) {
+      return null;
+    }
+  });
+
+  const [token, setToken] = useState(() => {
+    const savedToken = localStorage.getItem('token');
+    return (savedToken && savedToken !== "undefined") ? savedToken : null;
+  });
+
   const [loading, setLoading] = useState(true);
 
-  // Configure Axios default headers if a token exists
-  if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  } else {
-    delete axios.defaults.headers.common['Authorization'];
-  }
-
-  // Load user data when the app starts if they have a token
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser && token) {
-      setUser(JSON.parse(storedUser));
-    }
+    setAuthToken(token);
     setLoading(false);
   }, [token]);
 
-  // Login Function
   const login = async (email, password) => {
     try {
-      // Pointing to your backend login route
-      const response = await axios.post('http://localhost:5000/api/auth/login', { email, password });
-      
-      const { token, user } = response.data;
-      
-      // Save to state and local storage
-      setToken(token);
-      setUser(user);
+      const { token, user } = await authService.login(email, password);
+
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
+
+      setToken(token);
+      setUser(user);
+      setAuthToken(token);
       
-      return { success: true, role: user.role };
+      return { success: true, user };
     } catch (error) {
-      return { 
-        success: false, 
-        message: error.response?.data?.message || "Login failed. Please try again." 
-      };
+      console.error("Login Context Error:", error);
+      throw error;
     }
   };
 
-  // Logout Function
   const logout = () => {
-    setToken(null);
-    setUser(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+    setAuthToken(null);
+  };
+
+  const updateUser = (updatedUserData) => {
+    const newData = { ...user, ...updatedUserData };
+    localStorage.setItem('user', JSON.stringify(newData));
+    setUser(newData);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, login, logout, setUser: updateUser, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   );
