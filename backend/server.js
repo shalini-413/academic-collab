@@ -18,7 +18,8 @@ const app = express();
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  "http://localhost:5173"
+  "http://localhost:5173",
+  "https://academic-collab-o6lazaylk-shalini-413s-projects.vercel.app"
 ];
 
 app.use(cors({
@@ -194,15 +195,14 @@ app.use('/api/upload', require('./routes/uploadRoutes'))
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
+// backend/server.js
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('MongoDB Connected'))
   .catch((err) => console.log('DB Error: ', err));
 
-// const PORT = process.env.PORT || 5000;
-// server.listen(PORT, () => console.log(`Server on port ${PORT}`));
-
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+// FIXED: Changed app.listen to server.listen to correctly mount HTTP wrapper + WebSockets
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
