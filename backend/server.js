@@ -26,22 +26,34 @@ app.use(cors({
   origin: function (origin, callback) {
     // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
+// Check if origin is explicitly allowed or belongs to a vercel.app subdomain
+if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+  return callback(null, true);
+} else {
+  const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+  return callback(new Error(msg), false);
+}
   },
   credentials: true
 }));
 app.use(express.json());
 
 
-const server = http.createServer(app);
+// Update Socket.io CORS rules dynamically to match server policy
 const io = new Server(server, {
-  cors: { origin: process.env.FRONTEND_URL || "http://localhost:5173", methods: ["GET", "POST"] }
+  cors: { 
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'), false);
+      }
+    },
+    methods: ["GET", "POST"],
+    credentials: true
+  }
 });
-app.set('io', io);
+app.set('io', io)
 
 io.on('connection', (socket) => {
   // backend/server.js → Inside io.on('connection', (socket) => {
